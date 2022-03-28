@@ -30,7 +30,7 @@ pub enum EpisubEvent {
     payload: Vec<u8>,
   },
   Subscribed(String),
-  Unsubscibed(String),
+  Unsubscribed(String),
   PeerAdded(PeerId),
   PeerRemoved(PeerId),
 }
@@ -161,7 +161,7 @@ impl Episub {
   /// Stops responding to messages sent to this topic and informs
   /// all peers in the active and passive views that we are withdrawing
   /// from the cluster.
-  pub fn unsubscibe(&mut self, topic: String) -> bool {
+  pub fn unsubscribe(&mut self, topic: String) -> bool {
     if self.topics.get(&topic).is_none() {
       warn!(
         "Attempt to unsubscribe from a non-subscribed topic {}",
@@ -189,7 +189,7 @@ impl Episub {
       self
         .out_events
         .push_back(EpisubNetworkBehaviourAction::GenerateEvent(
-          EpisubEvent::Unsubscibed(topic),
+          EpisubEvent::Unsubscribed(topic),
         ));
 
       true
@@ -212,10 +212,10 @@ impl Episub {
 }
 
 impl NetworkBehaviour for Episub {
-  type ProtocolsHandler = EpisubHandler;
+  type ConnectionHandler = EpisubHandler;
   type OutEvent = EpisubEvent;
 
-  fn new_handler(&mut self) -> Self::ProtocolsHandler {
+  fn new_handler(&mut self) -> Self::ConnectionHandler {
     EpisubHandler::new(self.config.max_transmit_size, false)
   }
 
@@ -225,6 +225,7 @@ impl NetworkBehaviour for Episub {
     connection: &ConnectionId,
     endpoint: &ConnectedPoint,
     _failed_addresses: Option<&Vec<Multiaddr>>,
+    _other_established: usize,
   ) {
     if self.banned_peers.contains(peer_id) {
       self.force_disconnect(*peer_id, *connection);
@@ -289,7 +290,7 @@ impl NetworkBehaviour for Episub {
   fn inject_dial_failure(
     &mut self,
     peer_id: Option<PeerId>,
-    _: Self::ProtocolsHandler,
+    _: Self::ConnectionHandler,
     error: &DialError,
   ) {
     if !matches!(error, DialError::DialPeerConditionFalse(_)) {
@@ -309,6 +310,7 @@ impl NetworkBehaviour for Episub {
     _: &ConnectionId,
     endpoint: &ConnectedPoint,
     _: EpisubHandler,
+    _remaining_established: usize,
   ) {
     debug!(
       "Connection to peer {} closed on endpoint {:?}",
@@ -395,7 +397,7 @@ impl NetworkBehaviour for Episub {
     &mut self,
     cx: &mut Context<'_>,
     params: &mut impl PollParameters,
-  ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
+  ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
     // update local peer identity and addresses
     self.update_local_node_info(params);
 
